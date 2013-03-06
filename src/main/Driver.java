@@ -5,11 +5,11 @@ import java.awt.Frame;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
 import javax.imageio.ImageIO;
 import javax.swing.JOptionPane;
 import javax.swing.LookAndFeel;
 import javax.swing.UIManager;
+import javax.swing.UnsupportedLookAndFeelException;
 
 /**
  *
@@ -46,6 +46,57 @@ public class Driver
     
     /************** UTILITY FUNCTIONS **************/
     
+    /**
+     * Transposes the matrix A.  
+     * @param A The matrix to transpose
+     */
+    public static <T> void transpose(T[][] A)
+    {
+        for(int m = 0; m < A.length; m++)
+        {
+            // only iterate over the upper triangle
+            for(int n = m; n < A[m].length; n++)
+            {
+                // swap Amn with Anm
+                T temp = A[m][n];
+                A[m][n] = A[n][m];
+                A[n][m] = temp;
+            }
+        }
+    }
+    /**
+     * Multiplies A and B.  The output is the product A*B; if this operation is
+     * not possible because of the dimensions of A and B then this will return
+     * null.  This function assumes A and B are rectangular matrices.  If this
+     * is not the case it may throw an exception.
+     * @param A The left operand
+     * @param B The right operand
+     * @return The product A*B, or null if that is not possible
+     */
+    public static double[][] multiply(double[][] A, double[][] B)
+    {
+        if(A[0].length != B.length)
+        {
+            return null;
+        }
+        
+        double[][] out = new double[A.length][B[0].length];
+        for(int m = 0; m < out.length; m++)
+        {
+            for(int n = 0; n < out[m].length; n++)
+            {
+                // compute the out[m][n] entry
+                double val = 0;
+                for(int i = 0; i < A[m].length; i++)
+                {
+                    val += A[m][i]*B[i][n];
+                }
+                out[m][n] = val;
+            }
+        }
+        
+        return out;
+    }
     /**
      * Gets an image from a file using a FileDialog.  This implementation
      * provides image previews, but no file filtering.  The user can select any
@@ -123,7 +174,7 @@ public class Driver
                 }
             }
         }
-        catch (Exception e)
+        catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException e)
         {
             System.err.println("Error setting LAF: " + e);
         }
