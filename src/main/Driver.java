@@ -32,16 +32,21 @@ public class Driver
         }
         
         // save the image as a matrix
-        int[][] matrix = new int[i.getHeight()][i.getWidth()];
-        for(int m = 0; m < matrix.length; m++)
+        int[][] A = new int[i.getHeight()][i.getWidth()];
+        for(int m = 0; m < A.length; m++)
         {
-            for(int n = 0; n < matrix[m].length; n++)
+            for(int n = 0; n < A[m].length; n++)
             {
-                matrix[m][n] = i.getRGB(n, m);
+                A[n][m] = i.getRGB(n, m);
             }
         }
         
-        // decompose the matrix into U S V
+        // decompose the matrix into A = U S V
+        
+        int[][] At = transpose(A);
+        int[][] AtA = multiply(At, A);
+        
+        System.out.println(toString(AtA));
     }
     
     /************** UTILITY FUNCTIONS **************/
@@ -50,19 +55,22 @@ public class Driver
      * Transposes the matrix A.  
      * @param A The matrix to transpose
      */
-    public static <T> void transpose(T[][] A)
+    public static int[][] transpose(int[][] A)
     {
+        int [][] out = new int[A.length][A[0].length];
+        
         for(int m = 0; m < A.length; m++)
         {
             // only iterate over the upper triangle
             for(int n = m; n < A[m].length; n++)
             {
                 // swap Amn with Anm
-                T temp = A[m][n];
-                A[m][n] = A[n][m];
-                A[n][m] = temp;
+                out[m][n] = A[n][m];
+                out[n][m] = A[m][n];
             }
         }
+        
+        return out;
     }
     /**
      * Multiplies A and B.  The output is the product A*B; if this operation is
@@ -73,25 +81,105 @@ public class Driver
      * @param B The right operand
      * @return The product A*B, or null if that is not possible
      */
-    public static double[][] multiply(double[][] A, double[][] B)
+//    public static double[][] multiply(double[][] A, double[][] B)
+//    {
+//        if(A[0].length != B.length)
+//        {
+//            return null;
+//        }
+//        
+//        double[][] out = new double[A.length][B[0].length];
+//        for(int m = 0; m < out.length; m++)
+//        {
+//            for(int n = 0; n < out[m].length; n++)
+//            {
+//                // compute the out[m][n] entry
+//                int val = 0;
+//                for(int i = 0; i < A[m].length; i++)
+//                {
+//                    val += A[m][i]*B[i][n];
+//                }
+//                out[m][n] = val;
+//            }
+//        }
+//        
+//        return out;
+//    }
+    
+    
+    public static void bidiagonalize(double[][] A, double[][] U, double[][] B, double[][] V)
     {
-        if(A[0].length != B.length)
+        // check dimensions
+        
+        // choose v_1 = 2 unit norm vector
+        V[0][0] = 1;
+        for(int i = 1; i < V[0].length; i++)
         {
-            return null;
+            V[0][i] = 0;
         }
         
-        double[][] out = new double[A.length][B[0].length];
-        for(int m = 0; m < out.length; m++)
+        boolean virgin = true;
+        for(int k = 0; k < A[0].length; k++)
         {
-            for(int n = 0; n < out[m].length; n++)
+            // *** u_k = A v_k - Beta_k-1 u_k-1 ***
+            // build the kth column of U
+            if(virgin)
             {
-                // compute the out[m][n] entry
-                double val = 0;
-                for(int i = 0; i < A[m].length; i++)
-                {
-                    val += A[m][i]*B[i][n];
-                }
-                out[m][n] = val;
+                U[k] = multiply(A, V[k]);
+                virgin = false;
+            }
+            else
+            {
+                U[k] = subtract(multiply(A, V[k]), scale(B[k][k-1], U[k-1]));
+            }
+            
+            // alpha_k = |u_k|
+            double val = 0;
+            for(int i = 0; i < U[k].length; i++)
+            {
+                val += U[k][i]*U[k][i];
+            }
+            B[k][k] = Math.sqrt(val);
+            
+            // u_k = u_k/alpha_k
+            U[k] = scale(1/B[k][k], U[k]);
+            
+            // v_k+1 = A* u_k - alpha_k v_k
+            V[k+1] = subtract(multiply(transpose(A), U[k]), scale(B[k][k], V[k]));
+            
+            // Beta_k = |v_k+1|
+            val = 0;
+            for(int i = 0; i < V[k+1].length; i++)
+            {
+                val += V[k+1][i]*V[k+1][i];
+            }
+            B[k+1][k] = Math.sqrt(val);
+            
+            // v_k+1 = v_k+1/Beta_k
+            V[k+1] = scale(1/B[k+1][k], V[k+1]);
+        }
+    }
+    
+    public static String toString(int[][] A)
+    {
+        String out = "";
+        boolean virgin = true;
+        
+        for(int m = 0; m < A.length; m++)
+        {
+            if(!virgin)
+            {
+                out += "\n";
+            }
+            else
+            {
+                virgin = false;
+            }
+            
+            out += A[m][0];
+            for(int n = 1; n < A[m].length; n++)
+            {
+                out += "\t" + A[m][n];
             }
         }
         
