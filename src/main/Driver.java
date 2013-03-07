@@ -32,21 +32,35 @@ public class Driver
         }
         
         // save the image as a matrix
-        int[][] A = new int[i.getHeight()][i.getWidth()];
-        for(int m = 0; m < A.length; m++)
+        int[][] A = new int[i.getWidth()][i.getHeight()];
+        for(int y = 0; y < A[0].length; y++)
         {
-            for(int n = 0; n < A[m].length; n++)
+            for(int x = 0; x < A.length; x++)
             {
-                A[n][m] = i.getRGB(n, m);
+                A[x][y] = i.getRGB(x, y);
+            }
+        }
+        
+        // separate into rgb components
+        int W = A.length, H = A[0].length;
+        double[][] Ar = new double[W][H],
+                Ag = new double[W][H],
+                Ab = new double[W][H];
+        for(int x = 0; x < W; x++)
+        {
+            for(int y = 0; y < H; y++)
+            {
+                Ar[x][y] = A[x][y] >> 16 & 0xff;
+                Ag[x][y] = A[x][y] >> 8 & 0xff;
+                Ab[x][y] = A[x][y] & 0xff;
             }
         }
         
         // decompose the matrix into A = U S V
-        
-        int[][] At = transpose(A);
-        int[][] AtA = multiply(At, A);
-        
-        System.out.println(toString(AtA));
+        double[][] U = new double[A.length][A[0].length],
+                B = new double[A.length][A.length],
+                V = new double[A.length][A.length];
+        bidiagonalize(Ar, U, B, V);
     }
     
     /************** UTILITY FUNCTIONS **************/
@@ -55,61 +69,77 @@ public class Driver
      * Transposes the matrix A.  
      * @param A The matrix to transpose
      */
-    public static int[][] transpose(int[][] A)
+    public static double[][] transpose(double[][] A)
     {
-        int [][] out = new int[A.length][A[0].length];
+        double[][] out = new double[A[0].length][A.length];
         
-        for(int m = 0; m < A.length; m++)
+        for(int x = 0; x < A.length; x++)
         {
             // only iterate over the upper triangle
-            for(int n = m; n < A[m].length; n++)
+            for(int y = 0; y < A[x].length; y++)
             {
-                // swap Amn with Anm
-                out[m][n] = A[n][m];
-                out[n][m] = A[m][n];
+                out[y][x] = A[x][y];
             }
         }
         
         return out;
     }
-    /**
-     * Multiplies A and B.  The output is the product A*B; if this operation is
-     * not possible because of the dimensions of A and B then this will return
-     * null.  This function assumes A and B are rectangular matrices.  If this
-     * is not the case it may throw an exception.
-     * @param A The left operand
-     * @param B The right operand
-     * @return The product A*B, or null if that is not possible
-     */
-//    public static double[][] multiply(double[][] A, double[][] B)
-//    {
-//        if(A[0].length != B.length)
-//        {
-//            return null;
-//        }
-//        
-//        double[][] out = new double[A.length][B[0].length];
-//        for(int m = 0; m < out.length; m++)
-//        {
-//            for(int n = 0; n < out[m].length; n++)
-//            {
-//                // compute the out[m][n] entry
-//                int val = 0;
-//                for(int i = 0; i < A[m].length; i++)
-//                {
-//                    val += A[m][i]*B[i][n];
-//                }
-//                out[m][n] = val;
-//            }
-//        }
-//        
-//        return out;
-//    }
     
+    public static double[] scale(double c, double[] A)
+    {
+        double[] out = new double[A.length];
+        for(int i = 0; i < A.length; i++)
+        {
+            out[i] = c*A[i];
+        }
+        return out;
+    }
+    
+    // out = Ax
+    public static double[] multiply(double[][] A, double[] x)
+    {
+        // check dimensions
+        if(A.length != x.length)
+        {
+            throw new ArithmeticException("Invalid matrix dimensions: "+A[0].length+"x"+A.length+" times "+x.length+"x1");
+        }
+        
+        double[] out = new double[A[0].length];
+        for(int i = 0; i < out.length; i++)
+        {
+            // compute the ith entry of out
+            double val = 0;
+            for(int j = 0; j < x.length; j++)
+            {
+                val += A[j][i]*x[j];
+            }
+            out[i] = val;
+        }
+        
+        return out;
+    }
+    
+    public static double[] subtract(double[] A, double[] B)
+    {
+        if(A.length != B.length)
+        {
+            throw new ArithmeticException("Invalid matrix dimensions");
+        }
+        
+        double[] out = new double[A.length];
+        
+        for(int i = 0; i < A.length; i++)
+        {
+            out[i] = A[i] - B[i];
+        }
+        
+        return out;
+    }
     
     public static void bidiagonalize(double[][] A, double[][] U, double[][] B, double[][] V)
     {
         // check dimensions
+        
         
         // choose v_1 = 2 unit norm vector
         V[0][0] = 1;
@@ -119,9 +149,10 @@ public class Driver
         }
         
         boolean virgin = true;
-        for(int k = 0; k < A[0].length; k++)
+        for(int k = 0;; k++)
         {
-            // *** u_k = A v_k - Beta_k-1 u_k-1 ***
+            System.out.println("k: " + k);
+            // u_k = A v_k - Beta_k-1 u_k-1
             // build the kth column of U
             if(virgin)
             {
@@ -130,7 +161,7 @@ public class Driver
             }
             else
             {
-                U[k] = subtract(multiply(A, V[k]), scale(B[k][k-1], U[k-1]));
+                U[k] = subtract(multiply(A, V[k]), scale(B[k-1][k], U[k-1]));
             }
             
             // alpha_k = |u_k|
@@ -143,6 +174,12 @@ public class Driver
             
             // u_k = u_k/alpha_k
             U[k] = scale(1/B[k][k], U[k]);
+            
+            // test for completion and break if done
+            if(k+1 == A[0].length)
+            {
+                break;
+            }
             
             // v_k+1 = A* u_k - alpha_k v_k
             V[k+1] = subtract(multiply(transpose(A), U[k]), scale(B[k][k], V[k]));
@@ -160,30 +197,27 @@ public class Driver
         }
     }
     
-    public static String toString(int[][] A)
+    public static void print(double[][] A)
     {
-        String out = "";
         boolean virgin = true;
         
-        for(int m = 0; m < A.length; m++)
+        for(int y = 0; y < A[0].length; y++)
         {
             if(!virgin)
             {
-                out += "\n";
+                System.out.println("");
             }
             else
             {
                 virgin = false;
             }
             
-            out += A[m][0];
-            for(int n = 1; n < A[m].length; n++)
+            System.out.println(A[0][y]);
+            for(int x = 1; x < A.length; x++)
             {
-                out += "\t" + A[m][n];
+                System.out.println("\t" + A[x][y]);
             }
         }
-        
-        return out;
     }
     /**
      * Gets an image from a file using a FileDialog.  This implementation
