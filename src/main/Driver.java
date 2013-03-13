@@ -5,6 +5,7 @@ import java.awt.Frame;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 import javax.imageio.ImageIO;
 import javax.swing.JOptionPane;
 import javax.swing.LookAndFeel;
@@ -23,21 +24,21 @@ public class Driver
         
         // load an image file
         setBestLAF(); // set the look and feel to something more pretty
-        BufferedImage i = getImageWithPreview(null); // get the image
+        BufferedImage image = getImageWithPreview(null); // get the image
         
         // if the user hit the x, or cancel close the program
-        if(i == null)
+        if(image == null)
         {
             System.exit(0);
         }
         
         // save the image as a matrix
-        int[][] A = new int[i.getWidth()][i.getHeight()];
+        int[][] A = new int[image.getWidth()][image.getHeight()];
         for(int y = 0; y < A[0].length; y++)
         {
             for(int x = 0; x < A.length; x++)
             {
-                A[x][y] = i.getRGB(x, y);
+                A[x][y] = image.getRGB(x, y);
             }
         }
         
@@ -50,17 +51,23 @@ public class Driver
         {
             for(int y = 0; y < H; y++)
             {
-                Ar[x][y] = A[x][y] >> 16 & 0xff;
-                Ag[x][y] = A[x][y] >> 8 & 0xff;
+                Ar[x][y] = (A[x][y] >> 16) & 0xff;
+                Ag[x][y] = (A[x][y] >> 8) & 0xff;
                 Ab[x][y] = A[x][y] & 0xff;
             }
         }
         
         // decompose the matrix into A = U S V
-        double[][] U = new double[A.length][A[0].length],
-                B = new double[A.length][A.length],
+        double[][] U = new double[A[0].length][A[0].length],
+                B = new double[A.length][A[0].length],
                 V = new double[A.length][A.length];
         bidiagonalize(Ar, U, B, V);
+        // print(B);
+        
+        System.out.println("Multiplying");
+        
+        double[][] Af = multiply(multiply(U, B), V);
+        double[][] delta = subtract(Ar, Af);
     }
     
     /************** UTILITY FUNCTIONS **************/
@@ -119,6 +126,24 @@ public class Driver
         return out;
     }
     
+    public static double[][] multiply(double[][] A, double [][]B)
+    {
+        // check dimensions
+        if(A.length != B[0].length)
+        {
+            throw new ArithmeticException("Invalid magrix dimensions");
+        }
+        
+        double[][] out = new double[B.length][A[0].length];
+        
+        for(int i = 0; i < out.length; i++)
+        {
+            out[i] = multiply(A, B[i]);
+        }
+        
+        return out;
+    }
+    
     public static double[] subtract(double[] A, double[] B)
     {
         if(A.length != B.length)
@@ -136,9 +161,50 @@ public class Driver
         return out;
     }
     
+    public static double[][] subtract(double [][] A, double [][] B)
+    {
+        // chech dimensions
+        if(A.length != B.length || A[0].length != B[0].length)
+        {
+            throw new ArithmeticException("Invalid matrix dimensions");
+        }
+        
+        double [][] out = new double[A.length][A[0].length];
+        
+        for(int i = 0; i < A.length; i++)
+        {
+            for(int j = 0; j < A[i].length; j++)
+            {
+                out[i][j] = A[i][j] - B[i][j];
+            }
+        }
+        
+        return out;
+    }
+    
     public static void bidiagonalize(double[][] A, double[][] U, double[][] B, double[][] V)
     {
         // check dimensions
+        int cols = A.length;
+        int rows = A[0].length; // assume this is a rectangular matrix
+        if(U.length != cols || U[0].length != rows ||
+                B.length != cols || B[0].length != cols ||
+                V.length != cols || V[0].length != cols)
+        {
+            // one of the dimensions is off
+            System.out.println("Rows: "+rows+" Cols: "+cols);
+            System.out.println(U.length+"x"+U[0].length);
+            System.out.println(B.length+"x"+B[0].length);
+            System.out.println(V.length+"x"+V[0].length);
+            throw new ArithmeticException("Invalid UBV matrix dimensions");
+        }
+        
+        // check for a fat matrix
+        if(cols > rows)
+        {
+            bidiagonalize(transpose(A), U, B, V);
+            return;
+        }
         
         
         // choose v_1 = 2 unit norm vector
@@ -173,15 +239,17 @@ public class Driver
             B[k][k] = Math.sqrt(val);
             
             // u_k = u_k/alpha_k
+            // scale the kth column of U
             U[k] = scale(1/B[k][k], U[k]);
             
             // test for completion and break if done
-            if(k+1 == A[0].length)
+            if(k+1 == A.length)
             {
                 break;
             }
             
             // v_k+1 = A* u_k - alpha_k v_k
+            // build the k+1 column of V
             V[k+1] = subtract(multiply(transpose(A), U[k]), scale(B[k][k], V[k]));
             
             // Beta_k = |v_k+1|
@@ -193,30 +261,22 @@ public class Driver
             B[k+1][k] = Math.sqrt(val);
             
             // v_k+1 = v_k+1/Beta_k
+            // scale the k+1 column of V
             V[k+1] = scale(1/B[k+1][k], V[k+1]);
         }
     }
     
     public static void print(double[][] A)
     {
-        boolean virgin = true;
-        
         for(int y = 0; y < A[0].length; y++)
         {
-            if(!virgin)
-            {
-                System.out.println("");
-            }
-            else
-            {
-                virgin = false;
-            }
-            
-            System.out.println(A[0][y]);
+            System.out.print(A[0][y]);
             for(int x = 1; x < A.length; x++)
             {
-                System.out.println("\t" + A[x][y]);
+                System.out.print("\t" + A[x][y]);
             }
+            
+            System.out.println("");
         }
     }
     /**
