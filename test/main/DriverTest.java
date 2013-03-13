@@ -6,6 +6,7 @@ package main;
 
 import java.awt.Frame;
 import java.awt.image.BufferedImage;
+import java.util.Random;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -152,10 +153,63 @@ public class DriverTest
     public void testBidiagonalize()
     {
         System.out.println("bidiagonalize");
-        double[][] A = null;
-        double[][] U = null;
-        double[][] B = null;
-        double[][] V = null;
+        double[][] A = tall;
+        double[][] U = new double[2][3];
+        double[][] B = new double[2][2];
+        double[][] V = new double[2][2];
         Driver.bidiagonalize(A, U, B, V);
+        
+        double[][] f = Driver.multiply(Driver.multiply(U, B), V);
+        assertDoubleArrayEquals(A, f, delta);
+        
+        for(int i = 1; i < 200; i++)
+        {
+            A = generate(i);
+            U = new double[i][i];
+            B = new double[i][i];
+            V = new double[i][i];
+            Driver.bidiagonalize(A, U, B, V);
+            double[][] delta = Driver.subtract(Driver.multiply(Driver.multiply(U, B), V), A);
+            double maxD = 0;
+            for(double[] arr : delta)
+            {
+                for(double d : arr)
+                {
+                    d = Math.abs(d);
+                    if(d > maxD)
+                    {
+                        maxD = d;
+                    }
+                }
+            }
+            System.out.println(i+"\t"+maxD);
+        }
+    }
+    
+    private static double[][] generate(int n)
+    {
+        Random r = new Random();
+        double[][] out = new double[n][n];
+        for (int i = 0; i < out.length; i++)
+        {
+            for (int j = 0; j < out[i].length; j++)
+            {
+                out[i][j] = r.nextDouble() * 255;
+            }
+        }
+        return out;
+    }
+    
+    public static void assertDoubleArrayEquals(double[][] expected, double[][] actual, double delta)
+    {
+        if(expected.length != actual.length)
+        {
+            fail("Array dimension mismatch");
+        }
+        
+        for(int i = 0; i < expected.length; i++)
+        {
+            assertArrayEquals(expected[i], actual[i], delta);
+        }
     }
 }
